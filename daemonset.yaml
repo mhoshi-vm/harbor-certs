@@ -1,0 +1,51 @@
+#@ load("@ytt:data", "data")
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: harbor-setup
+  namespace: harbor-setup
+spec:
+  selector:
+    matchLabels:
+      job: harbor-setup
+  template:
+    metadata:
+      labels:
+        job: harbor-setup
+    spec:
+      #@ if data.values.tolerate_master:
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+      #@ end
+      imagePullSecrets:
+      - name: registry-secret
+      hostPID: true
+      containers:
+      - image: alpine
+        name: harbor-setup
+        command: ["sh", "/tmp/harbor-setup.sh"]
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name:  harbor-setup
+          mountPath: /tmp/harbor-setup.sh
+          subPath: harbor-setup.sh
+          readOnly: true
+        - name:  harbor-cert
+          mountPath: /tmp/harbor-cert
+          subPath: root-certificate.txt
+          readOnly: true
+        - name: host-mount
+          mountPath: /host
+      volumes:
+      - name: harbor-setup
+        configMap:
+          name: harbor-setup-bash
+      - name: harbor-cert
+        secret:
+          secretName: harbor-registry
+      - name: host-mount
+        hostPath:
+          path: /tmp/
